@@ -14,7 +14,7 @@ allowed-tools: Bash(bash:*) Bash(flagsmith:*) Read Edit
 All Flagsmith calls go through this skill's `scripts/fx.sh` (Flagsmith CLI only; terse output). Below, `$FX` means that file's path, e.g. `.claude/skills/flagsmith-experiment-rollout/scripts/fx.sh`. Run it from the repo root (where `flagsmith.json` is). Read its output instead of fetching raw JSON.
 
 ## Safety rules (always)
-- **Never start or ship without explicit human approval in this conversation.** `start` and `ship` refuse unless you pass `--confirm <experiment_id>`. Only add that flag after the human says yes to that exact change.
+- **A request is not an approval.** Even "ship X now" gets a confirmation step first. Before `start` or `ship`, reply with what will happen, that it can't be undone, the current `results` and `RECOMMEND:` line, and any conflict with the plan (for example, a stop time that hasn't been reached). End with a yes/no question and run nothing. Pass `--confirm <experiment_id>` only after the human answers yes in a later message. Never confirm in the same turn as the request.
 - In an environment whose name contains "prod", `start`/`ship` also need `--confirm-production`. Say so to the human before asking.
 - **Shipping is irreversible**: an ended experiment cannot be restarted.
 - Never commit keys. Never edit `flagsmith.env` or `.env*` files.
