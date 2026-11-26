@@ -104,7 +104,7 @@ results)
       .inference // {} | to_entries[] |
       "m \($m) \(.key) \(.value.chance_to_win) \(.value.lift) \(.value.ci_low) \(.value.ci_high) \($c.n) \($c.sum)"),
     (.metrics // [] | .[] | .variants | to_entries[] | "n \(.key) \(.value.n) \(.value.sum)")')
-  [[ -n $(grep '^m ' <<<"$res") ]] || { echo "experiment $id ($status): no results yet (each arm needs >=50 identities)"; exit 0; }
+  [[ -n $(grep '^m ' <<<"$res") ]] || { echo "experiment $id ($status) flag $flagname: no results yet (each arm needs >=50 identities)"; exit 0; }
   echo "experiment $id ($status) flag $flagname"
   grep '^n ' <<<"$res" | awk '!s[$2]++ {printf "  %s n=%s\n", $2, $3}'
   srm=$(sed -n 's/^asof .* srm //p' <<<"$res")

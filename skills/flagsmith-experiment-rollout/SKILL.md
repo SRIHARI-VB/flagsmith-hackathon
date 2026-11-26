@@ -31,7 +31,7 @@ Propose, then wait for approval:
 - **Guardrails** (optional): metrics that must not get worse, with `not_increase`/`not_decrease`.
 - **Rollout %** (100 unless traffic is risky) and the **decision rule**. Default: ship the variant if the primary has ≥95% chance to win, no guardrail is losing, and the sample ratio check passes. Otherwise keep control.
 
-Write the agreed plan to `EXPERIMENT.md` and commit it **before** starting, so the decision rule is fixed in advance.
+Write the agreed plan to `EXPERIMENT.md`, or to `EXPERIMENT-<flag>.md` if that file is taken, and commit it **before** starting, so the decision rule is fixed in advance.
 
 ## 3. Create (safe: nothing is live yet)
 ```
@@ -54,7 +54,7 @@ Ask: "Start experiment <id> on <environment>?" On yes:
 `bash $FX start <id> --confirm <id>`. Expect `running`. Edge caches can take ~20 s to serve the split.
 
 ## 6. Monitor
-`bash $FX results <id>` (refreshes at most every 5 min). Results appear once every arm has ≥50 identities. Report the table and the `RECOMMEND:` line in plain words. Peeking is safe (Bayesian), but decide only when the agreed stop time or sample is reached. If `srm_p` < 0.001, stop: assignment is broken.
+`bash $FX results <id>` (refreshes at most every 5 min). It prints the flag; find its plan with `grep -l <flag> EXPERIMENT*.md` (read only that file). Results appear once every arm has ≥50 identities. Report the table and the `RECOMMEND:` line in plain words. Peeking is safe (Bayesian), but decide only when the agreed stop time or sample is reached. If `srm_p` < 0.001, stop: assignment is broken.
 
 ## 7. Decide and ship (needs approval)
 Present the numbers, the `RECOMMEND:` line and the pre-registered rule. The human chooses. Then:
