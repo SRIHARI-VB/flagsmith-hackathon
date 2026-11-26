@@ -51,3 +51,4 @@ Otherwise, keep control. Inconclusive results are reported as inconclusive. **No
 Stop on **Nov 29, 2026, around 10:00 IST**. Stop earlier only if the split check fails; in that case, fix the problem and start over.
 
 ## Amendments
+- **2026-11-26 14:41 IST: experiment 584 started.** It was set up and started with the Track 04 skill (`fx.sh flag`, `create`, `start --confirm 584`), after this plan was committed (3cb435a, 14:39 IST). Before the start, the app version reading `first_screen_v2` was deployed. Assignment check: 12 fresh identities queried through the flag API got 8 control and 4 one_example. This read-only query records no exposures; Flagsmith showed 0 exposures after the check. Nothing in the plan changed.
