@@ -8,6 +8,7 @@
 //   node run.mjs --brain llm --n 20             # LLM personas, events SENT
 //
 // Options: --url <app url>  --concurrency <k>  --max-steps <m>  --send-events (rules only)  --print-snapshots
+//          --dry  (llm: block events, for calibration runs that must not touch the experiment)
 // LLM config (personas/.env): LLM_API_KEY, LLM_BASE_URL, LLM_MODEL. Any
 // OpenAI-compatible chat completions endpoint works (Gemini, Groq, OpenRouter...).
 //
@@ -32,13 +33,27 @@ const N = Number(args.n ?? 4);
 const URL_ = args.url ?? 'https://taskboard-toggle-wars.vercel.app';
 const CONCURRENCY = Number(args.concurrency ?? 2);
 const MAX_STEPS = Number(args['max-steps'] ?? 6);
-// Smoke runs must never pollute the experiment; LLM runs are the real traffic.
-const SEND_EVENTS = BRAIN === 'llm' || args['send-events'] === 'true';
+// Smoke runs must never pollute the experiment; LLM runs are the real traffic,
+// unless --dry (used for calibration).
+const DRY = args.dry === 'true';
+const SEND_EVENTS = !DRY && (BRAIN === 'llm' || args['send-events'] === 'true');
+
+// How much the visitor cares today. Drawn per session, independent of the
+// variant, so it sets the overall conversion level without favouring a version.
+const INTENTS = [
+  { id: 'browsing', weight: 55, text: "You have no real task in mind. You're only glancing because a friend asked. Leave once you've formed an impression, unless something genuinely makes you want to try it." },
+  { id: 'someday', weight: 30, text: 'You might use a tool like this someday, but nothing is urgent. You will try it only if it is quick and clear.' },
+  { id: 'needs_it', weight: 15, text: 'You have something to organise right now and are looking for a simple tool.' },
+];
+function pickIntent() {
+  let r = Math.random() * INTENTS.reduce((s, i) => s + i.weight, 0);
+  return INTENTS.find((i) => (r -= i.weight) < 0) ?? INTENTS[0];
+}
 
 const LLM = {
   key: process.env.LLM_API_KEY,
   base: (process.env.LLM_BASE_URL ?? 'https://generativelanguage.googleapis.com/v1beta/openai').replace(/\/$/, ''),
-  model: process.env.LLM_MODEL ?? 'gemini-2.5-flash-lite',
+  model: process.env.LLM_MODEL ?? 'gemini-3.5-flash-lite',
 };
 if (BRAIN === 'llm' && !LLM.key) {
   console.error('LLM_API_KEY missing: add it to personas/.env (see .env.example)');
@@ -98,12 +113,13 @@ function rulesBrain(_persona, snap, step) {
   return b ? { action: 'click', ref: Number(b[1]), thought: 'random click' } : { action: 'leave' };
 }
 
-const SYSTEM = `You role-play a real person visiting a web app for the first time. A friend sent you a link saying "try this task board". Stay in character: your patience and habits decide what you do. You may leave at any time if the page doesn't hold your interest; real people often do.
+const SYSTEM = `You role-play a real person visiting a web app for the first time. A friend sent you a link saying "try this task board". Stay in character: your intent, patience and habits decide what you do. Be realistic: most first-time visitors leave within seconds without doing anything, and leaving is always a fine choice. Never do something just because it is possible.
 Reply with ONLY a JSON object: {"thought": "<max 15 words>", "action": "click"|"type"|"leave", "ref": <number for click/type>, "text": "<what you type, for type>"}
 "type" enters text into a text box and presses Enter.`;
 
-async function llmBrain(persona, snap, step, history) {
+async function llmBrain(persona, snap, step, history, intent = INTENTS[0]) {
   const user = `You are ${persona.who}. Patience: ${persona.patience}. Habits: ${persona.style}.
+Today: ${intent.text}
 Step ${step + 1} of at most ${MAX_STEPS}.${history.length ? `\nSo far you: ${history.join('; ')}.` : ''}
 The page shows:
 ${snap}`;
@@ -141,17 +157,19 @@ ${snap}`;
 // ---------- one session ----------
 async function session(browser, n) {
   const persona = PERSONAS[Math.floor(Math.random() * PERSONAS.length)];
+  const intent = pickIntent();
   const uid = `persona_${BRAIN}_${randomUUID().slice(0, 8)}`;
   const ctx = await browser.newContext({ viewport: { width: 1200, height: 800 } });
   const page = await ctx.newPage();
   const events = [];
+  let failed = false; // a session that errors must not count: its events are dropped
   await page.route('**/events.api.flagsmith.com/**', async (route) => {
     for (const e of JSON.parse(route.request().postData() ?? '{}').events ?? [])
       events.push(e.event === '$flag_exposure' ? `exposure:${e.value}` : e.event);
-    return SEND_EVENTS ? route.continue() : route.abort();
+    return SEND_EVENTS && !failed ? route.continue() : route.abort();
   });
 
-  const log = { run: RUN_ID, n, uid, persona: persona.id, brain: BRAIN, sent: SEND_EVENTS, steps: [], tokens: 0 };
+  const log = { run: RUN_ID, n, uid, persona: persona.id, intent: intent.id, brain: BRAIN, sent: SEND_EVENTS, steps: [], tokens: 0 };
   const history = [];
   try {
     await page.goto(`${URL_}/?uid=${uid}`, { waitUntil: 'domcontentloaded' });
@@ -162,7 +180,7 @@ async function session(browser, n) {
     for (let step = 0; step < MAX_STEPS; step++) {
       const snap = await snapshot(page);
       if (args['print-snapshots']) console.log(`--- ${uid} step ${step + 1} sees:\n${snap}\n`);
-      const d = BRAIN === 'llm' ? await llmBrain(persona, snap, step, history) : rulesBrain(persona, snap, step);
+      const d = BRAIN === 'llm' ? await llmBrain(persona, snap, step, history, intent) : rulesBrain(persona, snap, step);
       log.tokens += (d.usage?.prompt_tokens ?? 0) + (d.usage?.completion_tokens ?? 0);
       log.steps.push({ action: d.action, ref: d.ref, text: d.text, thought: d.thought });
       if (d.action === 'leave' || !d.action) break;
@@ -181,6 +199,7 @@ async function session(browser, n) {
     }
   } catch (err) {
     log.error = String(err.message ?? err).slice(0, 200);
+    failed = true;
   } finally {
     // Leaving the page: the app flushes its event buffer on pagehide.
     await page.evaluate(() => dispatchEvent(new Event('pagehide'))).catch(() => {});
@@ -189,14 +208,23 @@ async function session(browser, n) {
     appendFileSync(LOG, JSON.stringify(log) + '\n');
     await ctx.close();
     const converted = events.includes('first_card_created') ? '✓ card' : '· no card';
-    console.log(`${String(n).padStart(3)} ${uid} ${persona.id.padEnd(16)} ${String(log.variant).padEnd(11)} ${converted.padEnd(9)} steps=${log.steps.length} tokens=${log.tokens}${log.error ? ' ERROR ' + log.error : ''}`);
+    console.log(`${String(n).padStart(3)} ${uid} ${persona.id.padEnd(16)} ${intent.id.padEnd(8)} ${String(log.variant).padEnd(11)} ${converted.padEnd(9)} steps=${log.steps.length} tokens=${log.tokens}${log.error ? ' ERROR ' + log.error : ''}`);
   }
   return log;
 }
 
 // ---------- main ----------
+// Preflight: make sure the brain answers before any page (and exposure) exists.
+if (BRAIN === 'llm') {
+  try {
+    await llmBrain({ who: 'a tester', patience: 'high', style: 'n/a' }, '#1 [button] OK', 0, []);
+  } catch (err) {
+    console.error(`LLM preflight failed, nothing was run: ${err.message}`);
+    process.exit(1);
+  }
+}
 const browser = await chromium.launch({ channel: 'msedge' });
-console.log(`run ${RUN_ID}: ${N} sessions, brain=${BRAIN}${BRAIN === 'llm' ? ` (${LLM.model})` : ''}, events ${SEND_EVENTS ? 'SENT to Flagsmith' : 'BLOCKED'}, url=${URL_}`);
+console.log(`run ${RUN_ID}: ${N} sessions, brain=${BRAIN}${BRAIN === 'llm' ? ` (${LLM.model})` : ''}, events ${SEND_EVENTS ? 'SENT to Flagsmith' : DRY ? 'BLOCKED (dry run)' : 'BLOCKED'}, url=${URL_}`);
 let next = 0;
 const results = [];
 await Promise.all(
