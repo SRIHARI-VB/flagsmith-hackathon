@@ -32,8 +32,18 @@ export default function App({ visitorId, offline }: { visitorId: string; offline
   // before Flagsmith is configured. Ignored when connected.
   const preview = new URLSearchParams(location.search).get('variant');
   const variant: Variant = offline ? toVariant(preview) : toVariant(flag?.value);
-  // Once flags have loaded, a missing flag (not created yet, or Flagsmith down) means control.
-  const ready = offline || !!flag || loading?.isLoading === false;
+  // Render only once the real assignment arrives from the server. The default
+  // flags exist from the first render, so rendering on them would flash the
+  // control board before swapping to the assigned variant. If Flagsmith fails
+  // or is slow (> 3 s), fall back to control.
+  const [timedOut, setTimedOut] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setTimedOut(true), 3000);
+    return () => clearTimeout(t);
+  }, []);
+  const fromServer = String(loading?.source) === 'SERVER';
+  const failed = !!loading?.error && !loading.isFetching;
+  const ready = offline || fromServer || failed || timedOut;
 
   return (
     <div className="page" data-variant={ready ? variant : 'loading'}>

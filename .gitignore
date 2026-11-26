@@ -5,3 +5,4 @@ dist
 *.local
 flagsmith.env
 STRATEGY.md
+.experiment-id

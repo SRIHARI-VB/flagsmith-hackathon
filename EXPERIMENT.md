@@ -49,4 +49,5 @@ If it is **Inconclusive**: report it as inconclusive, keep control, and say what
 Stop on **Nov 29, 2026, around 10:00 IST**, or earlier only if the SRM check fails (then fix and restart). Flagsmith's Bayesian engine makes peeking safe, but the decision is made once, at the end.
 
 ## Amendments
-_None yet._
+- **2026-11-26 08:20 IST: experiment 521 started.** The hypothesis, metrics and decision rule are unchanged from this plan.
+- **2026-11-26 08:21 IST: QA visits and a render fix.** Two QA identities (`assign_check_1` → sample_data, `assign_check_2` → control) each created one card to verify exposures and conversions end to end. Flagsmith recorded 1 exposure per arm and 0 excluded. One visit per arm keeps the test symmetric, and it is negligible against the planned traffic. The first QA visit exposed a bug: the page rendered the default (control) board for a moment before the server's assignment arrived. The app now waits for the server's assignment, with a 3-second fallback to control. Only that QA identity saw the bug, before any real traffic.
