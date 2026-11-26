@@ -137,6 +137,11 @@ ${snap}`;
       body: JSON.stringify(body),
     });
     if (res.status === 429 || res.status >= 500) {
+      const detail = await res.text();
+      if (/per ?day|PerDay/i.test(detail)) {
+        // Daily quota: retrying won't help. Fail this session and stop the run.
+        throw Object.assign(new Error('LLM daily quota exhausted'), { quota: true });
+      }
       const wait = Number(res.headers.get('retry-after')) * 1000 || 2000 * 2 ** attempt;
       await sleep(Math.min(wait, 60000));
       continue;
@@ -151,7 +156,9 @@ ${snap}`;
       return { action: 'leave', thought: `unparseable reply: ${text.slice(0, 60)}`, usage };
     }
   }
-  return { action: 'leave', thought: 'rate limited, gave up' };
+  // Never turn a failed call into a "leave": that would record a visitor who
+  // made no decision. Fail the session instead (its events are dropped).
+  throw new Error('LLM rate limited, gave up after retries');
 }
 
 // ---------- one session ----------
@@ -162,11 +169,16 @@ async function session(browser, n) {
   const ctx = await browser.newContext({ viewport: { width: 1200, height: 800 } });
   const page = await ctx.newPage();
   const events = [];
-  let failed = false; // a session that errors must not count: its events are dropped
+  // Every event request is HELD until the session ends, then all are sent (if
+  // the session completed) or all dropped (if it failed). Sending as they come
+  // would leak the exposure of a session that later fails, because the app
+  // flushes its buffer every 10 s.
+  let failed = false;
+  const held = [];
   await page.route('**/events.api.flagsmith.com/**', async (route) => {
     for (const e of JSON.parse(route.request().postData() ?? '{}').events ?? [])
       events.push(e.event === '$flag_exposure' ? `exposure:${e.value}` : e.event);
-    return SEND_EVENTS && !failed ? route.continue() : route.abort();
+    held.push(route);
   });
 
   const log = { run: RUN_ID, n, uid, persona: persona.id, intent: intent.id, brain: BRAIN, sent: SEND_EVENTS, steps: [], tokens: 0 };
@@ -200,10 +212,15 @@ async function session(browser, n) {
   } catch (err) {
     log.error = String(err.message ?? err).slice(0, 200);
     failed = true;
+    if (err.quota) STOP = true;
   } finally {
     // Leaving the page: the app flushes its event buffer on pagehide.
     await page.evaluate(() => dispatchEvent(new Event('pagehide'))).catch(() => {});
     await sleep(2500);
+    const send = SEND_EVENTS && !failed;
+    await Promise.all(held.map((r) => (send ? r.continue() : r.abort()).catch(() => {})));
+    if (send && held.length) await sleep(1500); // let the released requests complete
+    log.sent = send && held.length > 0;
     log.events = events;
     appendFileSync(LOG, JSON.stringify(log) + '\n');
     await ctx.close();
@@ -226,12 +243,14 @@ if (BRAIN === 'llm') {
 const browser = await chromium.launch({ channel: 'msedge' });
 console.log(`run ${RUN_ID}: ${N} sessions, brain=${BRAIN}${BRAIN === 'llm' ? ` (${LLM.model})` : ''}, events ${SEND_EVENTS ? 'SENT to Flagsmith' : DRY ? 'BLOCKED (dry run)' : 'BLOCKED'}, url=${URL_}`);
 let next = 0;
+let STOP = false; // set when the LLM's daily quota runs out
 const results = [];
 await Promise.all(
   Array.from({ length: CONCURRENCY }, async () => {
-    while (next < N) results.push(await session(browser, ++next));
+    while (next < N && !STOP) results.push(await session(browser, ++next));
   }),
 );
+if (STOP) console.log('Stopped early: LLM daily quota exhausted. Failed sessions sent nothing.');
 await browser.close();
 
 const by = (v) => results.filter((r) => r.variant === v);
