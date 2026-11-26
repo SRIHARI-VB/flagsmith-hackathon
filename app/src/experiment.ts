@@ -2,11 +2,12 @@
 // persona runner use the same strings: event names are case-sensitive, and an
 // event that doesn't match a metric is silently dropped by Flagsmith.
 
-export const FLAG = 'first_screen' as const;
+// Experiment 2. Experiment 1 used `first_screen` (empty vs. 3 sample cards; control won).
+export const FLAG = 'first_screen_v2' as const;
 
 export const VARIANTS = {
   control: 'control', // empty board + "Create your first task" call to action
-  sampleData: 'sample_data', // board pre-filled with example cards
+  oneExample: 'one_example', // the empty board plus one labelled example card
 } as const;
 
 export type Variant = (typeof VARIANTS)[keyof typeof VARIANTS];
@@ -38,5 +39,5 @@ export function getVisitorId(): string {
 }
 
 export function toVariant(value: unknown): Variant {
-  return value === VARIANTS.sampleData ? VARIANTS.sampleData : VARIANTS.control;
+  return value === VARIANTS.oneExample ? VARIANTS.oneExample : VARIANTS.control;
 }

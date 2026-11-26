@@ -254,7 +254,7 @@ if (STOP) console.log('Stopped early: LLM daily quota exhausted. Failed sessions
 await browser.close();
 
 const by = (v) => results.filter((r) => r.variant === v);
-for (const v of ['control', 'sample_data']) {
+for (const v of [...new Set(results.map((r) => r.variant).filter(Boolean))].sort()) {
   const rs = by(v);
   const conv = rs.filter((r) => r.events?.includes('first_card_created')).length;
   console.log(`${v.padEnd(11)} sessions=${rs.length} first_card=${conv} (${rs.length ? Math.round((100 * conv) / rs.length) : 0}%)`);

@@ -12,11 +12,7 @@ const COLUMNS: { key: Column; label: string }[] = [
   { key: 'done', label: 'Done' },
 ];
 
-const SAMPLE_CARDS: Card[] = [
-  { id: 's1', title: 'Draft the launch announcement', column: 'todo', sample: true },
-  { id: 's2', title: 'Review signup page copy', column: 'doing', sample: true },
-  { id: 's3', title: 'Set up the project board', column: 'done', sample: true },
-];
+const EXAMPLE_CARD: Card = { id: 'ex1', title: "Example: plan this week's priorities", column: 'todo', sample: true };
 
 const firstCardKey = (visitorId: string) => `ft_first_card_sent:${visitorId}`;
 
@@ -28,7 +24,7 @@ export default function App({ visitorId, offline }: { visitorId: string; offline
   // enrolled in a running experiment). Returns null until flags load.
   const flag = useExperiment(FLAG);
 
-  // Offline preview only: ?variant=sample_data lets you look at both versions
+  // Offline preview only: ?variant=one_example lets you look at both versions
   // before Flagsmith is configured. Ignored when connected.
   const preview = new URLSearchParams(location.search).get('variant');
   const variant: Variant = offline ? toVariant(preview) : toVariant(flag?.value);
@@ -55,7 +51,7 @@ export default function App({ visitorId, offline }: { visitorId: string; offline
       {offline && (
         <p className="banner">
           Offline preview: set <code>VITE_FLAGSMITH_ENVIRONMENT_ID</code> in <code>.env.local</code> to
-          connect. Showing <b>{variant}</b> (switch with <code>?variant=sample_data</code>).
+          connect. Showing <b>{variant}</b> (switch with <code>?variant=one_example</code>).
         </p>
       )}
 
@@ -76,7 +72,7 @@ export default function App({ visitorId, offline }: { visitorId: string; offline
 function Board({ variant, visitorId }: { variant: Variant; visitorId: string }) {
   const flagsmith = useFlagsmith();
   const [cards, setCards] = useState<Card[]>(() =>
-    variant === VARIANTS.sampleData ? SAMPLE_CARDS : [],
+    variant === VARIANTS.oneExample ? [EXAMPLE_CARD] : [],
   );
   const [title, setTitle] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -101,27 +97,22 @@ function Board({ variant, visitorId }: { variant: Variant; visitorId: string }) 
   const move = (id: string, column: Column) =>
     setCards((cs) => cs.map((c) => (c.id === id ? { ...c, column } : c)));
   const remove = (id: string) => setCards((cs) => cs.filter((c) => c.id !== id));
-  const clearSamples = () => setCards((cs) => cs.filter((c) => !c.sample));
 
   const isEmpty = cards.length === 0;
-  const hasSamples = cards.some((c) => c.sample);
+  const hasExample = cards.some((c) => c.sample);
 
   return (
     <main>
-      {variant === VARIANTS.control && isEmpty && (
+      {isEmpty && (
         <section className="hero" data-testid="empty-state">
           <h1>Your board is empty</h1>
           <p>Create your first task to get started.</p>
         </section>
       )}
 
-      {variant === VARIANTS.sampleData && hasSamples && userCards.length === 0 && (
-        <section className="hint" data-testid="sample-hint">
-          <b>Here's what a board looks like.</b> These are example cards: add your own task below
-          to make it yours.
-          <button className="link" onClick={clearSamples} data-testid="clear-samples">
-            Clear examples
-          </button>
+      {variant === VARIANTS.oneExample && hasExample && userCards.length === 0 && (
+        <section className="hint" data-testid="example-hint">
+          Add your own task below. Delete the example whenever you like.
         </section>
       )}
 
