@@ -1,0 +1,12 @@
+{
+  "name": "personas",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "smoke": "node run.mjs --brain rules --n 4",
+    "run": "node run.mjs --brain llm"
+  },
+  "dependencies": {
+    "playwright": "1.65.1"
+  }
+}

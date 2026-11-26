@@ -1,0 +1,22 @@
+[
+  { "id": "busy_pm", "who": "a product manager squeezing this in between meetings", "patience": "low", "style": "skims, acts only if the next step is obvious within seconds" },
+  { "id": "curious_dev", "who": "a software developer who likes trying new tools", "patience": "high", "style": "pokes at every button to see what it does" },
+  { "id": "first_timer", "who": "someone who has never used a task board or kanban tool", "patience": "medium", "style": "reads hints and instructions carefully, unsure what a board is for" },
+  { "id": "skeptic", "who": "a team lead who has tried many task tools and abandoned them", "patience": "low", "style": "looks for a reason to leave; needs to see value immediately" },
+  { "id": "student", "who": "a university student planning assignments", "patience": "medium", "style": "wants to jot down a few to-dos quickly" },
+  { "id": "designer", "who": "a UX designer evaluating the product's first impression", "patience": "high", "style": "notices layout and wording, explores before committing" },
+  { "id": "freelancer", "who": "a freelancer juggling client work", "patience": "medium", "style": "practical; will add a real task if it looks useful" },
+  { "id": "manager_on_phone", "who": "an operations manager glancing at a link a colleague sent", "patience": "very low", "style": "leaves fast unless something grabs attention" },
+  { "id": "non_native", "who": "someone whose first language is not English", "patience": "medium", "style": "relies on visual examples more than text" },
+  { "id": "power_user", "who": "a heavy Trello and Jira user", "patience": "medium", "style": "expects familiar patterns; tries to create and move a card" },
+  { "id": "retiree", "who": "a retired teacher organising a community event", "patience": "high", "style": "careful, reads everything, cautious about clicking the wrong thing" },
+  { "id": "founder", "who": "a startup founder looking for a lightweight tool for the team", "patience": "low", "style": "judges in seconds whether it is worth a minute" },
+  { "id": "qa_tester", "who": "a QA engineer", "patience": "high", "style": "tries edge cases: deleting, moving, clearing things" },
+  { "id": "marketer", "who": "a marketing specialist planning a campaign", "patience": "medium", "style": "drawn in by concrete examples relevant to their work" },
+  { "id": "distracted", "who": "a person browsing on a lunch break, half paying attention", "patience": "very low", "style": "clicks the most prominent thing or leaves" },
+  { "id": "planner", "who": "a highly organised person who loves lists", "patience": "high", "style": "adds several tasks once they understand the tool" },
+  { "id": "confused", "who": "someone who clicked a link without knowing what the site is", "patience": "low", "style": "looks for help or an explanation first" },
+  { "id": "engineer_lead", "who": "an engineering manager comparing tools for sprint planning", "patience": "medium", "style": "wants to see how cards flow between columns" },
+  { "id": "teacher", "who": "a school teacher planning lessons", "patience": "medium", "style": "follows examples closely if they are shown" },
+  { "id": "minimalist", "who": "someone who dislikes clutter and noisy interfaces", "patience": "medium", "style": "prefers clean screens; may clear anything they did not create" }
+]
