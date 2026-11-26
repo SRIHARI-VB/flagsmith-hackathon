@@ -5,6 +5,7 @@
 #   scripts/experiment.sh start     start it (locks the flag, turns on the 50/50 split)
 #   scripts/experiment.sh status    show status, exposures per variant
 #   scripts/experiment.sh results   refresh (max once per 5 min) and print results
+#   scripts/experiment.sh ship control|sample_data [--dry]   end it, serve the winner (asks to confirm)
 #
 # Run scripts/setup.sh first. The experiment id is stored in .experiment-id.
 set -euo pipefail
@@ -91,6 +92,34 @@ results)
     || echo "(refresh skipped: allowed at most once per 5 minutes)"
   flagsmith api "$API/experiments/$id/results/"; echo
   ;;
+ship)
+  # Ends the experiment and serves the chosen version to everyone.
+  # IRREVERSIBLE: an ended experiment cannot be restarted. Requires typing the id.
+  choice=${2:-}
+  [[ $choice == control || $choice == "$VARIANT" ]] || { echo "usage: $0 ship control|$VARIANT [--dry]" >&2; exit 1; }
+  id=$(exp_id)
+  if [[ $choice == control ]]; then
+    body='{"rollout_decision":"control"}'
+  else
+    variant_id=$(json_id_where "$(flagsmith feature variant list "$FLAG" --json)" key "$VARIANT")
+    body="{\"rollout_decision\":\"variant\",\"rollout_variant\":$variant_id}"
+  fi
+  echo "== latest results (check them against the decision rule in EXPERIMENT.md):"
+  flagsmith api "$API/experiments/$id/results/"; echo
+  echo "== will POST $API/experiments/$id/complete/ $body"
+  if [[ ${3:-} == --dry ]]; then echo "(dry run: nothing sent)"; exit 0; fi
+  read -r -p "This ends experiment $id for good and serves '$choice' to everyone. Type the experiment id to confirm: " confirm
+  [[ $confirm == "$id" ]] || { echo "Not confirmed, nothing changed."; exit 1; }
+  flagsmith api "$API/experiments/$id/complete/" --input - <<<"$body" >/dev/null
+  echo "== experiment $id: $(flagsmith api "$API/experiments/$id/" | python -I -c 'import json,sys; print(json.load(sys.stdin)["status"])')"
+  echo "== what new visitors get now:"
+  for i in 1 2 3 4 5 6; do
+    flagsmith api --sdk "api/v1/identities/?identifier=post_ship_check_$i" \
+      | python -I -c 'import json,sys
+d=json.load(sys.stdin); f=[x for x in d["flags"] if x["feature"]["name"]==sys.argv[1]][0]
+print("  ", d["identifier"], "->", f["feature_state_value"])' "$FLAG"
+  done
+  ;;
 *)
-  sed -n '2,9p' "$0"; exit 1 ;;
+  sed -n '2,10p' "$0"; exit 1 ;;
 esac
