@@ -62,3 +62,8 @@ Stop on **Nov 29, 2026, around 10:00 IST**. Stop earlier only if the split check
   1. The decision uses Flagsmith's pooled result, as pre-registered.
   2. RESULTS.md also reports the first-card rate **per model** (Gemini waves vs. the Nemotron wave) from the run logs. Each session's log records its model.
   3. If the two models point in opposite directions, the result is reported as model-dependent and treated as inconclusive, so control is kept.
+- **2026-11-27 15:30–15:43 IST: wave 5 (130 sessions, `nvidia/nemotron-3.5-bolt-e4b`).** All 130 sessions completed and were sent (65 control, 65 one_example), with 0 errors. Flagsmith's exposures went from 63 / 76 to **128 / 141**, exactly the logged numbers, with 0 excluded. Flagsmith's `first_card_created` sums (61 / 55) equal the logged converters, and typed cards equal `card_created` events (111 = 111), so there are no duplicates. Split: binomial p ≈ 0.46. **This completes the planned persona traffic. No further waves will be added, because adding traffic after seeing results would bias the stop.** The experiment stays running for real visitors until the planned stop.
+
+  Interim results, not a decision:
+  - **Pooled (Flagsmith):** `first_card_created` has a 6% chance that one_example is better (lift −18.1%, CI [−40.7%, +4.4%]): inconclusive. Guardrail `help_opened` has a 100% chance that one_example is better (lift −31%).
+  - **Per model (logs, the pre-declared check):** Gemini 59% vs 41% (P(one_example better) ≈ 0.02); Nemotron 37% vs 38% (≈ 0.57). The models don't point in opposite directions; Nemotron shows no effect.
