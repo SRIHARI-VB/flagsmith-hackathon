@@ -138,7 +138,7 @@ ${snap}`;
     });
     if (res.status === 429 || res.status >= 500) {
       const detail = await res.text();
-      if (/per ?day|PerDay/i.test(detail)) {
+      if (/per[ -]?day|PerDay|daily/i.test(detail)) {
         // Daily quota: retrying won't help. Fail this session and stop the run.
         throw Object.assign(new Error('LLM daily quota exhausted'), { quota: true });
       }
@@ -189,7 +189,7 @@ async function session(browser, n) {
     return route.fulfill({ status: 202, headers: { ...CORS, 'content-type': 'application/json' }, body: '{}' });
   });
 
-  const log = { run: RUN_ID, n, uid, persona: persona.id, intent: intent.id, brain: BRAIN, sent: SEND_EVENTS, steps: [], tokens: 0 };
+  const log = { run: RUN_ID, n, uid, persona: persona.id, intent: intent.id, brain: BRAIN, model: BRAIN === 'llm' ? LLM.model : null, sent: SEND_EVENTS, steps: [], tokens: 0 };
   const history = [];
   try {
     await page.goto(`${URL_}/?uid=${uid}`, { waitUntil: 'domcontentloaded' });
