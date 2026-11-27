@@ -7,7 +7,7 @@ Every new product faces the same first-screen question: show new users an **empt
 - **Live app:** https://taskboard-toggle-wars.vercel.app (each new visitor is randomly assigned to one arm of experiment 2)
 - **Experiment 1 plan and log:** [EXPERIMENT.md](EXPERIMENT.md) (finished)
 - **Experiment 2 plan and log:** [EXPERIMENT-2.md](EXPERIMENT-2.md) (running until Nov 29)
-- **Results and decisions:** [RESULTS.md](RESULTS.md) (published when experiment 2 ends on Nov 29)
+- **Results and findings:** [RESULTS.md](RESULTS.md) (experiment 1 done; experiment 2 added after Nov 29)
 - **Agent Skill (Track 04):** [skills/flagsmith-experiment-rollout](skills/flagsmith-experiment-rollout/SKILL.md)
 
 ## The experiments
@@ -62,7 +62,7 @@ A four-day hackathon can't get thousands of real visitors, and the organisers co
 - Each session also draws an **intent**: just browsing 55%, "maybe someday" 30%, needs a tool now 15%. Without it, the LLM created a card every time.
 - An LLM (Gemini Flash-Lite, free tier) reads a text snapshot of the page and chooses each action: click, type, add a card or leave. **The persona is never told its variant.** The snapshot hides the footer that shows it, and intents are drawn independently of the variant.
 - The prompt was calibrated **blind**: tuned only on the overall conversion rate, with events blocked, and frozen before real waves. When wave 1 converted more than calibration predicted, the prompt was **not** re-tuned, because by then the per-variant split had been seen.
-- **Failed sessions send nothing.** Events are held in the browser and released only when a session completes, so an LLM outage can't create exposures with no behaviour behind them. This was learned the hard way; see the Amendments.
+- **Failed sessions send nothing, and each event is sent once.** The runner answers the app's event requests itself, keeps one copy of each, and sends them to Flagsmith only when a session completes. An LLM outage can't create exposures with no behaviour behind them, and SDK retries can't create duplicates. Both were learned the hard way; see the Amendments and [RESULTS.md](RESULTS.md).
 
 **Honest limitation:** persona traffic shows how the design, the instrumentation and the decision process behave. It is **not** evidence of what humans prefer. RESULTS.md reports it that way, and any real human visits are counted in the same experiment.
 
@@ -121,7 +121,7 @@ Install it by copying the folder into `.claude/skills/` (or your agent's skills 
 ```
 EXPERIMENT.md     experiment 1: pre-registered plan + amendments log
 EXPERIMENT-2.md   experiment 2: pre-registered plan + amendments log
-RESULTS.md        final readout and decision (Nov 29)
+RESULTS.md        findings and decisions (experiment 1 now, experiment 2 on Nov 29)
 app/              Vite + React + TypeScript task board, Flagsmith JS SDK 12.6
 scripts/          experiment 1's setup.sh and experiment.sh (kept as run)
 personas/         Playwright + LLM persona runner, persona definitions, run logs (git-ignored)
