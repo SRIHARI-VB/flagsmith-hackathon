@@ -101,10 +101,14 @@ results)
     .results // {} | .payload // {} |
     "asof \(.as_of // "-") srm \(.srm_p_value // "-")",
     (.metrics // [] | .[] | .metric_id as $m | (.variants | to_entries | map(select(.key=="control")) | .[0].value) as $c |
-      .inference // {} | to_entries[] |
+      .inference // {} | to_entries[] | select(.value != null) |
       "m \($m) \(.key) \(.value.chance_to_win) \(.value.lift) \(.value.ci_low) \(.value.ci_high) \($c.n) \($c.sum)"),
     (.metrics // [] | .[] | .variants | to_entries[] | "n \(.key) \(.value.n) \(.value.sum)")')
-  [[ -n $(grep '^m ' <<<"$res") ]] || { echo "experiment $id ($status) flag $flagname: no results yet (each arm needs >=50 identities)"; exit 0; }
+  if [[ -z $(grep '^m ' <<<"$res") ]]; then
+    echo "experiment $id ($status) flag $flagname: no statistics yet (each arm needs >=50 identities)"
+    grep '^n ' <<<"$res" | awk '!s[$2]++ {printf "  %s n=%s primary=%s\n", $2, $3, $4}'
+    exit 0
+  fi
   echo "experiment $id ($status) flag $flagname"
   grep '^n ' <<<"$res" | awk '!s[$2]++ {printf "  %s n=%s\n", $2, $3}'
   srm=$(sed -n 's/^asof .* srm //p' <<<"$res")
