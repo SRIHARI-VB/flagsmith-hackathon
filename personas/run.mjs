@@ -153,7 +153,8 @@ ${snap}`;
     try {
       return { ...JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)), usage };
     } catch {
-      return { action: 'leave', thought: `unparseable reply: ${text.slice(0, 60)}`, usage };
+      // Not a decision: fail the session (events dropped) rather than log a "leave".
+      throw new Error(`unparseable LLM reply: ${text.slice(0, 60)}`);
     }
   }
   // Never turn a failed call into a "leave": that would record a visitor who
@@ -169,16 +170,23 @@ async function session(browser, n) {
   const ctx = await browser.newContext({ viewport: { width: 1200, height: 800 } });
   const page = await ctx.newPage();
   const events = [];
-  // Every event request is HELD until the session ends, then all are sent (if
-  // the session completed) or all dropped (if it failed). Sending as they come
-  // would leak the exposure of a session that later fails, because the app
-  // flushes its buffer every 10 s.
+  // Event requests are answered at once with a fake "accepted" and KEPT. When
+  // the session ends they are sent to Flagsmith once each (session completed)
+  // or dropped (session failed). Sending as they come would leak the exposure
+  // of a session that later fails. Holding the real request open instead (the
+  // wave 3 approach) made the SDK time out after 3 s and retry, and every
+  // retry was delivered: count metrics got duplicates.
   let failed = false;
-  const held = [];
+  const held = []; // { url, headers, body }
+  const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST, OPTIONS' };
   await page.route('**/events.api.flagsmith.com/**', async (route) => {
-    for (const e of JSON.parse(route.request().postData() ?? '{}').events ?? [])
+    const req = route.request();
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
+    const body = req.postData() ?? '{}';
+    for (const e of JSON.parse(body).events ?? [])
       events.push(e.event === '$flag_exposure' ? `exposure:${e.value}` : e.event);
-    held.push(route);
+    held.push({ url: req.url(), headers: await req.allHeaders(), body });
+    return route.fulfill({ status: 202, headers: { ...CORS, 'content-type': 'application/json' }, body: '{}' });
   });
 
   const log = { run: RUN_ID, n, uid, persona: persona.id, intent: intent.id, brain: BRAIN, sent: SEND_EVENTS, steps: [], tokens: 0 };
@@ -218,9 +226,17 @@ async function session(browser, n) {
     await page.evaluate(() => dispatchEvent(new Event('pagehide'))).catch(() => {});
     await sleep(2500);
     const send = SEND_EVENTS && !failed;
-    await Promise.all(held.map((r) => (send ? r.continue() : r.abort()).catch(() => {})));
-    if (send && held.length) await sleep(1500); // let the released requests complete
-    log.sent = send && held.length > 0;
+    let delivered = 0;
+    if (send) {
+      for (const h of held) {
+        const headers = Object.fromEntries(Object.entries(h.headers).filter(([k]) => !k.startsWith(':') && !['host', 'content-length', 'connection'].includes(k)));
+        const res = await fetch(h.url, { method: 'POST', headers, body: h.body }).catch((e) => ({ ok: false, status: String(e) }));
+        if (res.ok) delivered++;
+        else log.deliveryError = `events API ${res.status}`;
+      }
+    }
+    log.sent = send && held.length > 0 && delivered === held.length;
+    log.requests = { kept: held.length, delivered };
     log.events = events;
     appendFileSync(LOG, JSON.stringify(log) + '\n');
     await ctx.close();

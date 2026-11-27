@@ -52,3 +52,8 @@ Stop on **Nov 29, 2026, around 10:00 IST**. Stop earlier only if the split check
 
 ## Amendments
 - **2026-11-26 14:41 IST: experiment 584 started.** It was set up and started with the Track 04 skill (`fx.sh flag`, `create`, `start --confirm 584`), after this plan was committed (3cb435a, 14:39 IST). Before the start, the app version reading `first_screen_v2` was deployed. Assignment check: 12 fresh identities queried through the flag API got 8 control and 4 one_example. This read-only query records no exposures; Flagsmith showed 0 exposures after the check. Nothing in the plan changed.
+- **2026-11-27 08:30 IST: runner fix before any persona traffic (wave 4).** An audit of experiment 1 found that holding event requests open made the SDK time out and retry, so retries reached Flagsmith as duplicate events (see EXPERIMENT.md). The runner now answers the SDK's event requests immediately and keeps one copy of each. When the session ends, it sends them to Flagsmith once (session completed) or drops them (session failed). Tested before the wave:
+  - a dry run logged each typed card exactly once;
+  - a harmless non-metric test event sent this way was accepted by Flagsmith (HTTP 202).
+
+  Unreadable LLM replies now fail the session instead of counting as a "leave". The persona prompt, the metrics and the decision rule are unchanged.
